@@ -8,7 +8,7 @@ from pathlib import Path
 
 if __name__ == "__main__":
 
-    data_path = Path(r"../../data/comipled_data.parquet")
+    data_path = Path(r"../../data/compiled_data.parquet")
     result_path = Path(r"../../results/strategy/dca")
     result_path.mkdir(parents=True, exist_ok=True)
     save_path = result_path / "parquets"
