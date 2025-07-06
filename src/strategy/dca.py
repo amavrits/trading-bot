@@ -29,19 +29,19 @@ class StrategyDCA(StrategyBase):
         for ticker, group in df.groupby('Ticker'):
             price_series = group['Close'].dropna()
             dca_closes = price_series.resample(self.frequency).first().dropna()
-            dca_df = pd.DataFrame({
+            dca_ticker = pd.DataFrame({
                 'Close': dca_closes,
                 'Buy_amount': self.amount_per_asset,
             })
-            dca_df['Units_bought'] = dca_df['Buy_amount'] / dca_df['Close']
-            dca_df['Cumulative_units'] = dca_df['Units_bought'].cumsum()
-            dca_df['Total_invested'] = dca_df['Buy_amount'].cumsum()
-            dca_df['Portfolio_value'] = dca_df['Cumulative_units'] * dca_df['Close']
-            dca_df['PnL'] = dca_df['Portfolio_value'] - dca_df['Total_invested']
-            dca_df['Return_pct'] = (dca_df['Portfolio_value'] / dca_df['Total_invested'] -1 ) * 100
-            dca_df['Avg_cost'] = dca_df['Total_invested'] / dca_df['Cumulative_units']
-            dca_df['Ticker'] = ticker
-            results.append(dca_df.reset_index())
+            dca_ticker['Units_bought'] = dca_ticker['Buy_amount'] / dca_ticker['Close']
+            dca_ticker['Cumulative_units'] = dca_ticker['Units_bought'].cumsum()
+            dca_ticker['Total_invested'] = dca_ticker['Buy_amount'].cumsum()
+            dca_ticker['Portfolio_value'] = dca_ticker['Cumulative_units'] * dca_ticker['Close']
+            dca_ticker['PnL'] = dca_ticker['Portfolio_value'] - dca_ticker['Total_invested']
+            dca_ticker['Return_pct'] = (dca_ticker['Portfolio_value'] / dca_ticker['Total_invested'] -1 ) * 100
+            dca_ticker['Avg_cost'] = dca_ticker['Total_invested'] / dca_ticker['Cumulative_units']
+            dca_ticker['Ticker'] = ticker
+            results.append(dca_ticker.reset_index())
 
         return pd.concat(results).sort_values(['Ticker', 'Date']).reset_index(drop=True)
 
