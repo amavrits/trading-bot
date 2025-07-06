@@ -12,6 +12,22 @@ class StrategyDCA(StrategyBase):
         self.frequency = frequency
         self.assets = assets
 
+    def _compute_trade_dates(self, df):
+        grouped = df["Close"].resample(self.frequency)
+        # Get the first *available* date in each weekly group
+        actual_trade_dates = grouped.apply(lambda x: x.index[0])
+        return set(actual_trade_dates)
+
+    def generate_signals(self, df: pd.DataFrame) -> pd.DataFrame:
+
+        trade_dates = self._compute_trade_dates(df)
+
+        df["Signal"] = 0
+        for trade_date in trade_dates:
+            df.at[trade_date, "Signal"] = +1
+
+        return df["Signal"]
+
     def run(self, df: pd.DataFrame) -> pd.DataFrame:
 
         df = df.copy()
@@ -25,40 +41,20 @@ class StrategyDCA(StrategyBase):
 
         df.index = pd.to_datetime(df["Date"])
 
-        results = []
+        trade_units = []
         for ticker, group in df.groupby('Ticker'):
-            price_series = group['Close'].dropna()
-            dca_closes = price_series.resample(self.frequency).first().dropna()
-            dca_ticker = pd.DataFrame({
-                'Close': dca_closes,
-                'Buy_amount': self.amount_per_asset,
-            })
-            dca_ticker['Units_bought'] = dca_ticker['Buy_amount'] / dca_ticker['Close']
-            dca_ticker['Cumulative_units'] = dca_ticker['Units_bought'].cumsum()
-            dca_ticker['Total_invested'] = dca_ticker['Buy_amount'].cumsum()
-            dca_ticker['Portfolio_value'] = dca_ticker['Cumulative_units'] * dca_ticker['Close']
-            dca_ticker['PnL'] = dca_ticker['Portfolio_value'] - dca_ticker['Total_invested']
-            dca_ticker['Return_pct'] = (dca_ticker['Portfolio_value'] / dca_ticker['Total_invested'] -1 ) * 100
-            dca_ticker['Avg_cost'] = dca_ticker['Total_invested'] / dca_ticker['Cumulative_units']
-            dca_ticker['Ticker'] = ticker
-            results.append(dca_ticker.reset_index())
 
-        return pd.concat(results).sort_values(['Ticker', 'Date']).reset_index(drop=True)
+            signal = self.generate_signals(group)
 
-    def backtest(self, df: pd.DataFrame, backtest_runner=None, verbose=False, log_path=None, **kwargs) -> pd.DataFrame:
+            trade_units_ticker = pd.DataFrame(index=group.index)
+            trade_units_ticker["Date"] = group["Date"]
+            trade_units_ticker["Trade_units"] = signal.values
+            trade_units_ticker["Trade_units"] *= self.amount_per_asset / group["Close"]
+            trade_units_ticker["Ticker"] = ticker
 
-        if backtest_runner is None:
-            raise ValueError("Please provide a backtest runner.")
+            trade_units.append(trade_units_ticker.reset_index(drop=True))
 
-        result = backtest_runner(df, self, **kwargs)
-
-        if verbose:
-            if log_path:
-                log_summary(result, log_path=log_path)
-            else:
-                log_summary(result)
-
-        return result
+        return pd.concat(trade_units).sort_values(['Ticker', 'Date']).reset_index(drop=True)
 
 
 if __name__ == "__main__":

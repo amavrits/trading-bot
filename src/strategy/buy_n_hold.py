@@ -16,9 +16,10 @@ class StrategyBuynHold(StrategyBase):
         df['Signal'] = 0
         if not df.empty:
             df.at[df.index[0], 'Signal'] = 1  # Buy at the first available date
-        return df
+        return df["Signal"]
 
     def run(self, df: pd.DataFrame) -> pd.DataFrame:
+
         df = df.copy()
         df = df.sort_index()
 
@@ -30,58 +31,19 @@ class StrategyBuynHold(StrategyBase):
 
         df.index = pd.to_datetime(df["Date"])
 
-        results = []
+        trade_units = []
         for ticker, group in df.groupby('Ticker'):
+
             signal = self.generate_signals(group)
-            price_series = group['Close']
 
-            units_bought = np.where(signal["Signal"] > 0, 1, 0)
-            cum_units_bought = units_bought.cumsum()
-            units_bought = np.where(  # only buy once
-                cum_units_bought > 1,
-                0,
-                units_bought
-            )
+            trade_units_ticker = pd.DataFrame(index=group.index)
+            trade_units_ticker["Date"] = group["Date"]
+            trade_units_ticker["Trade_units"] = np.where(signal["Signal"] > 0, 1, 0)
+            trade_units_ticker["Ticker"] = ticker
 
-            bh_ticker = pd.DataFrame()
-            bh_ticker['Date'] = price_series.index
-            bh_ticker['Close'] = price_series.values
-            bh_ticker['Units_bought'] = units_bought
-            bh_ticker['Buy_amount'] = bh_ticker['Close'] * bh_ticker['Units_bought']
-            bh_ticker['Cumulative_units'] = bh_ticker['Units_bought'].cumsum()
-            bh_ticker['Total_invested'] = bh_ticker["Buy_amount"].cumsum()
-            bh_ticker['Portfolio_value'] = bh_ticker['Close'] * bh_ticker['Cumulative_units']
-            bh_ticker['PnL'] = bh_ticker['Portfolio_value'] - bh_ticker['Total_invested']
-            bh_ticker['Return_pct'] = np.where(
-                bh_ticker['Total_invested'] > 0,
-                (bh_ticker['Portfolio_value'] / bh_ticker['Total_invested'] - 1) * 100,
-                0
-            )
-            bh_ticker['Avg_cost'] = np.where(
-                bh_ticker['Cumulative_units'] > 0,
-                bh_ticker['Total_invested'] / bh_ticker['Cumulative_units'],
-                0
-            )
-            bh_ticker['Ticker'] = ticker
+            trade_units.append(trade_units_ticker.reset_index(drop=True))
 
-            results.append(bh_ticker.reset_index(drop=True))
-
-        return pd.concat(results).sort_values(['Ticker', 'Date']).reset_index(drop=True)
-
-    def backtest(self, df: pd.DataFrame, backtest_runner=None, verbose=False, log_path=None, **kwargs) -> pd.DataFrame:
-
-        if backtest_runner is None:
-            raise ValueError("Please provide a backtest runner.")
-
-        result = backtest_runner(df, self, **kwargs)
-
-        if verbose:
-            if log_path:
-                log_summary(result, log_path=log_path)
-            else:
-                log_summary(result)
-
-        return result
+        return pd.concat(trade_units).sort_values(['Ticker', 'Date']).reset_index(drop=True)
 
 
 if __name__ == "__main__":

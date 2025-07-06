@@ -36,7 +36,7 @@ class StrategyRSI(StrategyBase):
         df.loc[df['RSI'] < self.buy_threshold, 'Signal'] = 1
         df.loc[df['RSI'] > self.sell_threshold, 'Signal'] = -1
 
-        return df
+        return df["Signal"]
 
     def run(self, df: pd.DataFrame) -> pd.DataFrame:
 
@@ -51,59 +51,30 @@ class StrategyRSI(StrategyBase):
 
         df.index = pd.to_datetime(df["Date"])
 
-        results = []
+        trade_units = []
         for ticker, group in df.groupby('Ticker'):
 
             signal = self.generate_signals(group)
 
-            units_bought = np.where(signal["Signal"] > 0, +1, np.where(signal["Signal"]<0, -1, 0))
-            cum_units_bought = units_bought.cumsum()
-            cum_units_bought = np.clip(cum_units_bought, a_min=0, a_max=None)
-            units_bought = np.where(  # Can't sell if no stock has been bought
-                np.logical_and(units_bought==-1, cum_units_bought<=0),
+            units = np.where(signal["Signal"] > 0, +1, np.where(signal["Signal"]<0, -1, 0))
+            cum_units = units.cumsum()
+            cum_units = np.clip(cum_units, a_min=0, a_max=None)
+            units = np.where(  # Can't sell if no stock has been bought
+                np.logical_and(units==-1, cum_units<=0),
                 0,
-                units_bought
+                units
             )
 
-            rsi_ticker = pd.DataFrame()
-            rsi_ticker['Date'] = signal['Date']
-            rsi_ticker['Close'] = signal['Close']
-            rsi_ticker['Units_bought'] = units_bought
-            rsi_ticker['Buy_amount'] = rsi_ticker['Close'] * rsi_ticker['Units_bought']
-            rsi_ticker['Cumulative_units'] = rsi_ticker['Units_bought'].cumsum()
-            rsi_ticker['Total_invested'] = rsi_ticker["Buy_amount"].cumsum()
-            rsi_ticker['Portfolio_value'] = rsi_ticker['Close'] * rsi_ticker['Cumulative_units']
-            rsi_ticker['PnL'] = rsi_ticker['Portfolio_value'] - rsi_ticker['Total_invested']
-            rsi_ticker['Return_pct'] = np.where(
-                rsi_ticker['Total_invested'] > 0,
-                (rsi_ticker['Portfolio_value'] / rsi_ticker['Total_invested'] -1 ) * 100,
-                0
-            )
-            rsi_ticker['Avg_cost'] = np.where(
-                rsi_ticker['Cumulative_units'] > 0,
-                rsi_ticker['Total_invested'] / rsi_ticker['Cumulative_units'],
-                0
-            )
-            rsi_ticker['Ticker'] = ticker
+            trade_units_ticker = pd.DataFrame(index=group.index)
+            trade_units_ticker["Date"] = group["Date"]
+            trade_units_ticker["Trade_units"] = units
+            trade_units_ticker["Ticker"] = ticker
+            
+            trade_units_ticker["Trade_units"] = units
 
-            results.append(rsi_ticker.reset_index(drop=True))
+            trade_units.append(trade_units_ticker.reset_index(drop=True))
 
-        return pd.concat(results).sort_values(['Ticker', 'Date']).reset_index(drop=True)
-
-    def backtest(self, df: pd.DataFrame, backtest_runner=None, verbose=False, log_path=None, **kwargs) -> pd.DataFrame:
-
-        if backtest_runner is None:
-            raise ValueError("Please provide a backtest runner.")
-
-        result = backtest_runner(df, self, **kwargs)
-
-        if verbose:
-            if log_path:
-                log_summary(result, log_path=log_path)
-            else:
-                log_summary(result)
-
-        return result
+        return pd.concat(trade_units).sort_values(['Ticker', 'Date']).reset_index(drop=True)
 
 
 if __name__ == "__main__":
