@@ -1,5 +1,5 @@
 import pandas as pd
-from src.strategy.rsi import StrategyRSI
+from src.strategy.sma import StrategySMACrossover
 from src.backtesting.core import run_strategy
 from src.backtesting.metrics import *
 import matplotlib.pyplot as plt
@@ -9,7 +9,7 @@ from pathlib import Path
 if __name__ == "__main__":
 
     data_path = Path(r"../../data/compiled_data.parquet")
-    result_path = Path(r"../../results/strategy/rsi")
+    result_path = Path(r"../../results/strategy/sma")
     result_path.mkdir(parents=True, exist_ok=True)
     save_path = result_path / "parquets"
     save_path.mkdir(parents=True, exist_ok=True)
@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     df = pd.read_parquet(data_path)
 
-    strategy = StrategyRSI(period=14, buy_threshold=30, sell_threshold=70)
+    strategy = StrategySMACrossover(short_window=20, long_window=50,)
     result = strategy.backtest(df, backtest_runner=run_strategy, verbose=True, log_path=log_path)
 
     result_sum = compute_total_pnl(result)

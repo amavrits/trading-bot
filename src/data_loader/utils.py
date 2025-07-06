@@ -122,7 +122,7 @@ def compile_datasets(path: str | Path):
 
     out_path = path.parent
     out_path.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(out_path/"comipled_data.parquet", index=False)
+    df.to_parquet(out_path/"compiled_data.parquet", index=False)
 
     return df
 
