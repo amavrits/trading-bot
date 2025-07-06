@@ -10,7 +10,7 @@ def compute_total_pnl(result_df: pd.DataFrame) -> pd.DataFrame:
     """
     df = result_df.copy()
     total_df = (
-        df.groupby('Date')[['PnL', 'Total_invested', 'Portfolio_value']]
+        df.groupby('Date')[['PnL', 'Total_invested', 'Portfolio_value', 'Return_pct']]
         .sum()
         .reset_index()
     )

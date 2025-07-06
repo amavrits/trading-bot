@@ -42,4 +42,7 @@ class StrategyBase(ABC):
         """
         return json.dumps(self.get_params(), indent=2)
 
+    def generate_signals(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Add a 'Signal' column with 1 (buy), -1 (sell), or 0 (hold)."""
+        pass
 
