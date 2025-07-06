@@ -60,3 +60,56 @@ def log_summary(result_df: pd.DataFrame, include_total=True, log_path=None):
         log_file = log_path / f"summary_{ts}.csv"
         summary.to_csv(log_file, index=False)
 
+
+def compare_strategies(strategies: dict, df: pd.DataFrame, metric: str = "Return_pct"):
+
+    all_summaries = []
+
+    for name, strategy in strategies.items():
+
+        print(f"🔍 Running {name}...")
+        output = strategy.run(df)
+
+        summary = (
+            output
+            .groupby('Ticker')
+            .agg({
+                'Portfolio_value': 'last',
+                'Total_invested': 'last',
+                'PnL': 'last',
+                'Return_pct': 'last',
+                'Cumulative_units': 'last',
+                'Avg_cost': 'last',
+            })
+            .reset_index()
+        )
+        summary['Strategy'] = name
+        all_summaries.append(summary)
+
+    combined = pd.concat(all_summaries).reset_index(drop=True)
+
+    # Rank per Ticker
+    combined['Rank'] = combined.groupby('Ticker')[metric].rank(ascending=False, method='first')
+    best_strats = (
+        combined[combined['Rank'] == 1][['Ticker', 'Strategy']]
+        .rename(columns={'Strategy': 'Best_strategy'})
+    )
+    combined = combined.merge(best_strats, on='Ticker', how='left')
+
+    # ---- Global Summary ----
+    global_summary = (
+        combined
+        .groupby('Strategy')
+        .agg(
+            Avg_Return_pct=('Return_pct', 'mean'),
+            Total_PnL=('PnL', 'sum'),
+            Win_count=('Rank', lambda r: (r == 1).sum()),
+        )
+        .sort_values(by='Avg_Return_pct', ascending=False)
+        .reset_index()
+    )
+
+    best_global = global_summary.iloc[0]['Strategy']
+
+    return combined.sort_values(['Ticker', 'Rank']).reset_index(drop=True), global_summary, best_global
+
